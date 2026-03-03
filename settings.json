@@ -1,0 +1,98 @@
+{
+    "studios": [
+        "Cham",
+        "Regensburg"
+    ],
+    "layout": [
+        {
+            "id": "beratungen",
+            "Feldname": "Beratungen heute",
+            "Kategorie": "Vertrieb & Abos",
+            "Sortierung": 10
+        },
+        {
+            "id": "abos_heute",
+            "Feldname": "Abos gesamt heute",
+            "Kategorie": "Vertrieb & Abos",
+            "Sortierung": 20
+        },
+        {
+            "id": "online_abos_heute",
+            "Feldname": "davon Online-Abos",
+            "Kategorie": "Vertrieb & Abos",
+            "Sortierung": 30
+        },
+        {
+            "id": "abos_12m",
+            "Feldname": "davon 12 Monate",
+            "Kategorie": "Vertrieb & Abos",
+            "Sortierung": 40
+        },
+        {
+            "id": "abos_1m",
+            "Feldname": "davon 1 Monat",
+            "Kategorie": "Vertrieb & Abos",
+            "Sortierung": 50
+        },
+        {
+            "id": "abos_fitnessplus",
+            "Feldname": "davon Fitness+",
+            "Kategorie": "Vertrieb & Abos",
+            "Sortierung": 60
+        },
+        {
+            "id": "leads_intern",
+            "Feldname": "Leads intern (VIP/10er)",
+            "Kategorie": "Leads & Calls",
+            "Sortierung": 10
+        },
+        {
+            "id": "sonstige_leads",
+            "Feldname": "Sonstige Leads",
+            "Kategorie": "Leads & Calls",
+            "Sortierung": 20
+        },
+        {
+            "id": "termine_callin",
+            "Feldname": "Termine durch Call-in",
+            "Kategorie": "Leads & Calls",
+            "Sortierung": 30
+        },
+        {
+            "id": "termine_callout",
+            "Feldname": "Termine durch Call-out",
+            "Kategorie": "Leads & Calls",
+            "Sortierung": 40
+        },
+        {
+            "id": "termine_callout_plus",
+            "Feldname": "davon Fitness+ (Call-out)",
+            "Kategorie": "Leads & Calls",
+            "Sortierung": 50
+        },
+        {
+            "id": "checkups_heute",
+            "Feldname": "Check Ups heute",
+            "Kategorie": "Sonstiges",
+            "Sortierung": 10
+        },
+        {
+            "id": "sonstiges",
+            "Feldname": "Sonstiges (PT etc.)",
+            "Kategorie": "Sonstiges",
+            "Sortierung": 20
+        },
+        {
+            "id": "checkins",
+            "Feldname": "Check-Ins",
+            "Kategorie": "Sonstiges",
+            "Sortierung": 30
+        },
+        {
+            "id": "tagesziel_erreicht",
+            "Feldname": "Tagesziel erreicht?",
+            "Kategorie": "Tagesziel",
+            "Sortierung": 10
+        }
+    ]
+}
