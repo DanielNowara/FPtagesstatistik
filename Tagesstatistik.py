@@ -5,7 +5,10 @@ import json
 from datetime import date, timedelta
 import calendar
 import plotly.express as px
+import plotly.graph_objects as go
 import streamlit.components.v1 as components
+import gspread
+from google.oauth2.service_account import Credentials
 
 # --- KONFIGURATION ---
 st.set_page_config(page_title="Tagesstatistik", page_icon="🏋️‍♂️", layout="wide")
@@ -13,6 +16,7 @@ st.set_page_config(page_title="Tagesstatistik", page_icon="🏋️‍♂️", la
 DATA_FILE = "tagesstatistik_daten.csv"
 ZIELE_FILE = "ziele_daten.csv"
 SETTINGS_FILE = "settings.json"
+GSHEET_URL = "HIER_SPÄTER_DEINE_GOOGLE_SHEET_URL_EINTRAGEN" # Wird später wichtig
 
 # Standard-Layout
 DEFAULT_LAYOUT = [
@@ -32,6 +36,22 @@ DEFAULT_LAYOUT = [
     {"id": "checkins", "Feldname": "Check-Ins", "Kategorie": "Sonstiges", "Sortierung": 30}
 ]
 
+# --- GOOGLE SHEETS VERBINDUNG (Intelligenter Fallback) ---
+@st.cache_resource
+def get_gspread_client():
+    if "gcp_service_account" in st.secrets:
+        try:
+            scopes = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
+            creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scopes)
+            return gspread.authorize(creds)
+        except Exception as e:
+            st.error(f"Google Sheets Fehler: {e}")
+            return None
+    return None
+
+def nutze_gsheets():
+    return "gcp_service_account" in st.secrets and GSHEET_URL != "HIER_SPÄTER_DEINE_GOOGLE_SHEET_URL_EINTRAGEN"
+
 # --- DATEN-FUNKTIONEN ---
 def load_settings():
     if os.path.exists(SETTINGS_FILE):
@@ -44,6 +64,19 @@ def save_settings(settings):
         json.dump(settings, f, indent=4)
 
 def load_data():
+    if nutze_gsheets():
+        client = get_gspread_client()
+        if client:
+            try:
+                sheet = client.open_by_url(GSHEET_URL).worksheet("Tagesdaten")
+                records = sheet.get_all_records()
+                if records:
+                    df = pd.DataFrame(records)
+                    df['Datum'] = pd.to_datetime(df['Datum']).dt.date
+                    return df
+            except Exception:
+                pass # Fallback auf CSV, falls Tabellenblatt nicht existiert
+    
     if os.path.exists(DATA_FILE):
         df = pd.read_csv(DATA_FILE)
         df['Datum'] = pd.to_datetime(df['Datum']).dt.date
@@ -52,8 +85,11 @@ def load_data():
 
 def save_data(new_data_dict):
     df = load_data()
+    # Datumsformat für Sheets/CSV vereinheitlichen
+    new_data_dict['Datum'] = str(new_data_dict['Datum']) 
     
     if not df.empty and 'Datum' in df.columns and 'Studio' in df.columns:
+        df['Datum'] = df['Datum'].astype(str)
         mask = (df['Datum'] == new_data_dict['Datum']) & (df['Studio'] == new_data_dict['Studio'])
         if mask.any():
             for key, value in new_data_dict.items():
@@ -63,31 +99,62 @@ def save_data(new_data_dict):
             df = pd.concat([df, new_df], ignore_index=True)
     else:
         df = pd.DataFrame([new_data_dict])
-        
-    df.to_csv(DATA_FILE, index=False)
+    
+    # Speichern
+    if nutze_gsheets():
+        client = get_gspread_client()
+        if client:
+            sheet = client.open_by_url(GSHEET_URL).worksheet("Tagesdaten")
+            sheet.clear()
+            sheet.update([df.columns.values.tolist()] + df.values.tolist())
+    else:
+        df.to_csv(DATA_FILE, index=False)
 
 def load_ziele():
+    if nutze_gsheets():
+        client = get_gspread_client()
+        if client:
+            try:
+                sheet = client.open_by_url(GSHEET_URL).worksheet("Ziele")
+                records = sheet.get_all_records()
+                if records:
+                    return pd.DataFrame(records)
+            except Exception:
+                pass
+                
     if os.path.exists(ZIELE_FILE):
         return pd.read_csv(ZIELE_FILE)
-    return pd.DataFrame(columns=[
-        "Monat_Jahr", "Studio", "Monatsziel_Abos", "Auslaufende_Abos", 
-        "Ziel_VIP_Leads_Woche", "Ziel_CallOut_Woche", "Ziel_CheckUps_Woche"
-    ])
+    return pd.DataFrame(columns=["Monat_Jahr", "Studio", "Monatsziel_Abos", "Auslaufende_Abos", "Ziel_VIP_Leads_Woche", "Ziel_CallOut_Woche", "Ziel_CheckUps_Woche"])
 
 def save_ziele(neue_ziele_dict):
     df = load_ziele()
-    mask = (df['Monat_Jahr'] == neue_ziele_dict['Monat_Jahr']) & (df['Studio'] == neue_ziele_dict['Studio'])
-    if mask.any():
-        df.loc[mask, :] = pd.DataFrame([neue_ziele_dict]).values
+    if not df.empty:
+        mask = (df['Monat_Jahr'] == neue_ziele_dict['Monat_Jahr']) & (df['Studio'] == neue_ziele_dict['Studio'])
+        if mask.any():
+            df.loc[mask, :] = pd.DataFrame([neue_ziele_dict]).values
+        else:
+            new_df = pd.DataFrame([neue_ziele_dict])
+            df = pd.concat([df, new_df], ignore_index=True)
     else:
-        new_df = pd.DataFrame([neue_ziele_dict])
-        df = pd.concat([df, new_df], ignore_index=True)
-    df.to_csv(ZIELE_FILE, index=False)
+        df = pd.DataFrame([neue_ziele_dict])
+        
+    if nutze_gsheets():
+        client = get_gspread_client()
+        if client:
+            sheet = client.open_by_url(GSHEET_URL).worksheet("Ziele")
+            sheet.clear()
+            sheet.update([df.columns.values.tolist()] + df.values.tolist())
+    else:
+        df.to_csv(ZIELE_FILE, index=False)
 
 settings = load_settings()
 
 # --- APP STRUKTUR ---
 st.title("🏋️‍♂️ Tagesstatistik Fitnesspoint")
+if nutze_gsheets():
+    st.caption("☁️ Verbunden mit Google Sheets")
+else:
+    st.caption("💾 Lokaler Speicher-Modus (CSV)")
 
 tab1, tab2, tab3 = st.tabs(["📝 Tagesabschluss", "⚙️ Admin & Setup", "📊 Auswertung & Dashboard"])
 
@@ -112,6 +179,7 @@ with tab1:
     tage_im_monat = calendar.monthrange(jahr, monat)[1]
     
     df_tagesdaten = load_data()
+    df_tagesdaten['Datum'] = pd.to_datetime(df_tagesdaten['Datum']).dt.date
     df_ziele = load_ziele()
     
     aktuelle_ziele = df_ziele[(df_ziele['Monat_Jahr'] == monat_jahr_str) & (df_ziele['Studio'] == studio)]
@@ -124,20 +192,17 @@ with tab1:
         ziel_callout_woche = aktuelle_ziele.iloc[0]['Ziel_CallOut_Woche']
         ziel_checkups_woche = aktuelle_ziele.iloc[0]['Ziel_CheckUps_Woche']
 
-    # --- MATHE: BERECHNUNG DES TAGESZIELS ---
     werktage_im_monat = sum(1 for d in range(1, tage_im_monat + 1) if calendar.weekday(jahr, monat, d) < 5)
     wochenendtage_im_monat = tage_im_monat - werktage_im_monat
-            
     nenner = werktage_im_monat + 0.5 * wochenendtage_im_monat
     ziel_werktag = ziel_abos / nenner if nenner > 0 else 0
     ziel_wochenende = ziel_werktag * 0.5
     
     ist_wochenende = eingabe_datum.weekday() >= 5
     heutiges_soll_ziel = ziel_wochenende if ist_wochenende else ziel_werktag
-    
     erwartete_abos_bisher = sum(ziel_wochenende if calendar.weekday(jahr, monat, d) >= 5 else ziel_werktag for d in range(1, eingabe_datum.day + 1))
 
-    if not df_tagesdaten.empty and 'Datum' in df_tagesdaten.columns:
+    if not df_tagesdaten.empty:
         df_monat = df_tagesdaten[(df_tagesdaten['Studio'] == studio) & 
                                  (pd.to_datetime(df_tagesdaten['Datum']).dt.year == jahr) & 
                                  (pd.to_datetime(df_tagesdaten['Datum']).dt.month == monat) &
@@ -207,7 +272,7 @@ with tab1:
                 "Sonstiges": get_val("sonstiges"), "CheckIns": get_val("checkins"), "Tagesziel_erreicht": tagesziel_erreicht
             }
             save_data(new_data)
-            st.success("✅ Erfolgreich gespeichert! (Bestehender Eintrag wurde überschrieben, falls vorhanden)")
+            st.success("✅ Erfolgreich gespeichert!")
 
             final_abos_monat = abos_bisher_monat + abos_heute
             final_online_monat = online_bisher_monat + get_val("online_abos_heute")
@@ -215,19 +280,17 @@ with tab1:
             final_callout_woche = callout_bisher_woche + get_val("termine_callout")
             final_checkups_woche = checkups_bisher_woche + get_val("checkups_heute")
 
-            # STATUS FÜR ZIELKURS BERECHNEN
             if final_abos_monat >= erwartete_abos_bisher:
                 kurs_text = f"🟢 AUF KURS (Soll: {erwartete_abos_bisher:.1f} | Ist: {final_abos_monat})"
-                kurs_bg = "#d4edda" # hellgrün
+                kurs_bg = "#d4edda"
                 kurs_border = "#c3e6cb"
                 kurs_color = "#155724"
             else:
                 kurs_text = f"🔴 HINTERHER (Soll: {erwartete_abos_bisher:.1f} | Ist: {final_abos_monat})"
-                kurs_bg = "#f8d7da" # hellrot
+                kurs_bg = "#f8d7da"
                 kurs_border = "#f5c6cb"
                 kurs_color = "#721c24"
 
-            # ANTI-QUETSCH-LAYOUT MIT STATUS-BOX
             html_bericht_mit_js = f"""
             <!DOCTYPE html>
             <html>
@@ -237,18 +300,11 @@ with tab1:
                     body {{ font-family: Arial, sans-serif; padding: 10px; background-color: white; margin: 0; }}
                     .btn {{ margin-bottom: 20px; padding: 15px 20px; background-color: #25D366; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; box-shadow: 1px 1px 5px rgba(0,0,0,0.3); width: 100%; display: block; text-align: center; }}
                     .btn:hover {{ background-color: #128C7E; }}
-                    
-                    /* Der Container sorgt dafür, dass auf dem Handy gescrollt werden kann */
                     .report-wrapper {{ width: 100%; overflow-x: auto; padding-bottom: 20px; display: flex; justify-content: flex-start; }}
-                    
-                    /* Dieses Feld bleibt immer stur 800 Pixel breit! */
                     #report {{ background-color: white; color: black; padding: 30px; border: 2px solid #333; border-radius: 8px; width: 800px; min-width: 800px; box-sizing: border-box; }}
-                    
                     h2 {{ text-align: center; margin-top: 0; padding-bottom: 10px; border-bottom: 2px solid black; font-size: 24px; }}
                     .date-row {{ text-align: center; font-size: 18px; margin-bottom: 15px; }}
-                    
                     .status-box {{ background-color: {kurs_bg}; color: {kurs_color}; border: 1px solid {kurs_border}; padding: 12px; border-radius: 6px; text-align: center; font-weight: bold; font-size: 18px; margin-bottom: 25px; }}
-                    
                     .row {{ display: flex; justify-content: space-between; gap: 40px; }}
                     .col {{ flex: 1; }}
                     h3 {{ background-color: #f0f0f0; padding: 6px 12px; border-left: 4px solid #d9232a; margin-bottom: 12px; font-size: 16px; margin-top: 0; }}
@@ -262,16 +318,11 @@ with tab1:
             </head>
             <body>
                 <button class="btn" onclick="downloadImage()">📸 Bericht als Bild für WhatsApp speichern</button>
-                
                 <div class="report-wrapper">
                     <div id="report">
                         <h2>Tagesstatistik Fitnesspoint {studio}</h2>
                         <div class="date-row"><strong>Datum:</strong> {eingabe_datum.strftime('%d.%m.%Y')}</div>
-                        
-                        <div class="status-box">
-                            Zielkurs-Status: {kurs_text}
-                        </div>
-
+                        <div class="status-box">Zielkurs-Status: {kurs_text}</div>
                         <div class="row">
                             <div class="col">
                                 <h3>Monatsziele:</h3>
@@ -281,7 +332,6 @@ with tab1:
                                     <tr><td class="sub">davon Online-Abos:</td><td class="right">{final_online_monat}</td></tr>
                                     <tr><td>Auslaufende Abos:</td><td class="right"><strong>{ziel_auslaufend}</strong></td></tr>
                                 </table>
-
                                 <h3>Tagesziel:</h3>
                                 <table>
                                     <tr><td>Beratungen heute:</td><td class="right"><strong>{new_data['Beratungen_heute']}</strong></td></tr>
@@ -292,7 +342,6 @@ with tab1:
                                     <tr><td class="sub">davon Fitness+:</td><td class="right">{new_data['Abos_FitnessPlus']}</td></tr>
                                 </table>
                             </div>
-
                             <div class="col">
                                 <h3>EOAs Wochenziele (Mo-So):</h3>
                                 <table>
@@ -300,7 +349,6 @@ with tab1:
                                     <tr><td>Termine Call-out (Ziel {ziel_callout_woche}):</td><td class="right"><strong>{final_callout_woche}</strong></td></tr>
                                     <tr><td>Check Ups (Ziel: {ziel_checkups_woche}):</td><td class="right"><strong>{final_checkups_woche}</strong></td></tr>
                                 </table>
-
                                 <h3>Aktivitäten Heute:</h3>
                                 <table style="margin-bottom: 0;">
                                     <tr><td>Leads intern (VIP/10er):</td><td class="right"><strong>{new_data['Leads_intern']}</strong></td></tr>
@@ -313,21 +361,17 @@ with tab1:
                                 </table>
                             </div>
                         </div>
-
                         <div class="target-box">
                             <strong style="font-size: 18px;">TAGESZIEL ERREICHT:</strong> 
                             <span style="margin-left: 20px; font-size: 20px;">JA: {ja_box}</span>
                             <span style="margin-left: 20px; font-size: 20px;">NEIN: {nein_box}</span>
                         </div>
-                        
                         <p class="quote">"Nur wer sein Ziel kennt, findet den Weg dorthin"</p>
                     </div>
                 </div>
-
                 <script>
                 function downloadImage() {{
                     const element = document.getElementById('report');
-                    // windowWidth erzwingt, dass html2canvas das Bild im 800px Modus schießt!
                     html2canvas(element, {{ scale: 2, windowWidth: 800 }}).then(canvas => {{
                         let link = document.createElement('a');
                         link.download = 'Tagesstatistik_{studio}_{eingabe_datum.strftime("%d_%m_%Y")}.png';
@@ -339,8 +383,7 @@ with tab1:
             </body>
             </html>
             """
-            
-            st.info("Klicke auf den grünen Button, um das fertige Bild im neuen Breitbild-Format direkt herunterzuladen!")
+            st.info("Klicke auf den grünen Button, um das fertige Bild herunterzuladen!")
             components.html(html_bericht_mit_js, height=850, scrolling=True)
 
 # ==========================================
@@ -373,18 +416,11 @@ with tab2:
     st.subheader("📋 Formular-Layout anpassen")
     df_layout = pd.DataFrame(settings["layout"])
     df_layout = df_layout[df_layout["id"] != "tagesziel_erreicht"]
-    
     edited_layout = st.data_editor(
-        df_layout, 
-        disabled=["id", "Feldname"], 
-        hide_index=True,
-        column_config={
-            "Kategorie": st.column_config.TextColumn("Kategorie (Überschrift)"),
-            "Sortierung": st.column_config.NumberColumn("Sortierung (10, 20, 30...)")
-        },
+        df_layout, disabled=["id", "Feldname"], hide_index=True,
+        column_config={"Kategorie": st.column_config.TextColumn("Kategorie (Überschrift)"), "Sortierung": st.column_config.NumberColumn("Sortierung")},
         use_container_width=True
     )
-    
     if st.button("💾 Layout Änderungen speichern"):
         settings["layout"] = edited_layout.to_dict('records')
         save_settings(settings)
@@ -422,11 +458,12 @@ with tab2:
             st.success(f"Ziele für {admin_studio} ({admin_monat.strftime('%m/%Y')}) gespeichert!")
 
 # ==========================================
-# TAB 3: AUSWERTUNG & DASHBOARD
+# TAB 3: DAS ÜBERRAGENDE DASHBOARD
 # ==========================================
 with tab3:
     st.header("📊 Auswertung & Dashboard")
     df_auswertung = load_data()
+    df_ziele_ausw = load_ziele()
     
     if df_auswertung.empty:
         st.info("Noch keine Daten vorhanden. Trage zuerst Statistiken ein.")
@@ -449,47 +486,110 @@ with tab3:
 
         if len(selected_dates) == 2:
             start_date, end_date = selected_dates
-            
             mask = (df_auswertung['Datum'] >= start_date) & (df_auswertung['Datum'] <= end_date) & (df_auswertung['Studio'].isin(selected_studios))
             df_filtered = df_auswertung[mask]
             
             if not df_filtered.empty:
                 st.divider()
                 
-                st.subheader("💡 Kennzahlen im gewählten Zeitraum")
+                # --- SUB-TABS FÜR DAS DASHBOARD ---
+                tab_kpi, tab_funnel, tab_charts, tab_data = st.tabs(["🏆 Performance", "🌪️ Funnel & Struktur", "📈 Verläufe", "📋 Rohdaten"])
                 
+                # BERECHNUNGEN
                 sum_beratungen = df_filtered['Beratungen_heute'].sum() if 'Beratungen_heute' in df_filtered else 0
                 sum_abos = df_filtered['Abos_heute'].sum() if 'Abos_heute' in df_filtered else 0
-                sum_leads = (df_filtered['Leads_intern'].sum() + df_filtered['Sonstige_Leads'].sum()) if 'Leads_intern' in df_filtered else 0
-                
+                sum_leads = (df_filtered['Leads_intern'].sum() + df_filtered['Sonstige_Leads'].sum() + df_filtered['Termine_CallIn'].sum() + df_filtered['Termine_CallOut_heute'].sum()) if 'Leads_intern' in df_filtered else 0
                 abschlussquote = (sum_abos / sum_beratungen * 100) if sum_beratungen > 0 else 0.0
                 
-                kpi1, kpi2, kpi3, kpi4 = st.columns(4)
-                kpi1.metric("🤝 Beratungen", f"{sum_beratungen:.0f}")
-                kpi2.metric("📝 Abos (Gesamt)", f"{sum_abos:.0f}")
-                kpi3.metric("🎯 Abschlussquote", f"{abschlussquote:.1f} %")
-                kpi4.metric("🔥 Leads (Gesamt)", f"{sum_leads:.0f}")
-                
-                st.divider()
-                
-                st.subheader("📈 Detaillierte Auswertung (Grafik)")
-                
-                numerische_spalten = df_filtered.select_dtypes(include=['number']).columns.tolist()
-                auswahl_wert = st.selectbox("Welchen Wert möchtest du auswerten?", numerische_spalten, 
-                                            index=numerische_spalten.index('Abos_heute') if 'Abos_heute' in numerische_spalten else 0)
-                
-                fig = px.bar(df_filtered, x="Datum", y=auswahl_wert, color="Studio", 
-                             title=f"Verlauf von '{auswahl_wert}'", barmode="group",
-                             labels={auswahl_wert: "Anzahl", "Datum": "Tag"})
-                
-                fig.update_xaxes(type='category')
-                st.plotly_chart(fig, use_container_width=True)
-                
-                st.divider()
-                
-                st.subheader("📋 Gefilterte Rohdaten (Tabelle)")
-                st.dataframe(df_filtered.sort_values(by="Datum", ascending=False), use_container_width=True)
-                
+                # 1. TAB: PERFORMANCE
+                with tab_kpi:
+                    st.subheader("💡 Key Performance Indicators (KPIs)")
+                    kpi1, kpi2, kpi3, kpi4 = st.columns(4)
+                    kpi1.metric("🔥 Leads gesamt generiert", f"{sum_leads:.0f}")
+                    kpi2.metric("🤝 Beratungen geführt", f"{sum_beratungen:.0f}")
+                    kpi3.metric("📝 Abos geschrieben", f"{sum_abos:.0f}")
+                    kpi4.metric("🎯 Abschlussquote", f"{abschlussquote:.1f} %")
+                    
+                    st.write("---")
+                    st.subheader("🎯 Zielerreichung (Aktueller Monat für das erste gewählte Studio)")
+                    if selected_studios:
+                        akt_studio = selected_studios[0]
+                        akt_monat_str = f"{end_date.year}-{end_date.month:02d}"
+                        ziel_db = df_ziele_ausw[(df_ziele_ausw['Monat_Jahr'] == akt_monat_str) & (df_ziele_ausw['Studio'] == akt_studio)]
+                        
+                        if not ziel_db.empty:
+                            monats_soll_abos = ziel_db.iloc[0]['Monatsziel_Abos']
+                            
+                            # Tacho (Gauge) Diagramm für Abos
+                            fig_gauge = go.Figure(go.Indicator(
+                                mode = "gauge+number",
+                                value = sum_abos,
+                                title = {'text': f"Abos vs. Monatsziel ({akt_studio})"},
+                                gauge = {
+                                    'axis': {'range': [None, monats_soll_abos], 'tickwidth': 1, 'tickcolor': "darkblue"},
+                                    'bar': {'color': "#d9232a"},
+                                    'bgcolor': "white",
+                                    'steps': [
+                                        {'range': [0, monats_soll_abos*0.5], 'color': "#ffcccc"},
+                                        {'range': [monats_soll_abos*0.5, monats_soll_abos*0.8], 'color': "#ff9999"},
+                                        {'range': [monats_soll_abos*0.8, monats_soll_abos], 'color': "#d4edda"}],
+                                    'threshold': {
+                                        'line': {'color': "black", 'width': 4},
+                                        'thickness': 0.75,
+                                        'value': monats_soll_abos}}))
+                            fig_gauge.update_layout(height=300, margin=dict(l=20, r=20, t=50, b=20))
+                            st.plotly_chart(fig_gauge, use_container_width=True)
+                        else:
+                            st.warning(f"Keine Monatsziele für {akt_studio} in {akt_monat_str} gefunden.")
+
+                # 2. TAB: FUNNEL & STRUKTUR
+                with tab_funnel:
+                    col_fun, col_pie = st.columns(2)
+                    
+                    with col_fun:
+                        st.subheader("🌪️ Sales Funnel")
+                        st.caption("Wie viele Leads werden am Ende zum Abo?")
+                        fig_funnel = px.funnel(
+                            x=[sum_leads, sum_beratungen, sum_abos],
+                            y=['Leads generiert', 'Beratungen geführt', 'Abos abgeschlossen'],
+                            labels={"x": "Anzahl", "y": "Stufe"}
+                        )
+                        fig_funnel.update_traces(marker=dict(color=["#3498db", "#e67e22", "#2ecc71"]))
+                        st.plotly_chart(fig_funnel, use_container_width=True)
+                        
+                    with col_pie:
+                        st.subheader("🧩 Abo-Struktur")
+                        st.caption("Verteilung der abgeschlossenen Abos")
+                        sum_12m = df_filtered['Abos_12M'].sum()
+                        sum_1m = df_filtered['Abos_1M'].sum()
+                        sum_fitplus = df_filtered['Abos_FitnessPlus'].sum()
+                        
+                        fig_pie = px.pie(
+                            names=['12 Monate', '1 Monat', 'Fitness+'],
+                            values=[sum_12m, sum_1m, sum_fitplus],
+                            hole=0.4
+                        )
+                        fig_pie.update_traces(textinfo='percent+label')
+                        st.plotly_chart(fig_pie, use_container_width=True)
+
+                # 3. TAB: VERLÄUFE
+                with tab_charts:
+                    st.subheader("📈 Verlaufsanalyse")
+                    numerische_spalten = df_filtered.select_dtypes(include=['number']).columns.tolist()
+                    auswahl_wert = st.selectbox("Welchen Wert möchtest du auswerten?", numerische_spalten, 
+                                                index=numerische_spalten.index('Abos_heute') if 'Abos_heute' in numerische_spalten else 0)
+                    
+                    fig_bar = px.bar(df_filtered, x="Datum", y=auswahl_wert, color="Studio", 
+                                 title=f"Verlauf von '{auswahl_wert}'", barmode="group",
+                                 labels={auswahl_wert: "Anzahl", "Datum": "Tag"})
+                    fig_bar.update_xaxes(type='category')
+                    st.plotly_chart(fig_bar, use_container_width=True)
+
+                # 4. TAB: ROHDATEN
+                with tab_data:
+                    st.subheader("📋 Rohdaten im Zeitraum")
+                    st.dataframe(df_filtered.sort_values(by="Datum", ascending=False), use_container_width=True)
+                    
             else:
                 st.warning("Für den ausgewählten Zeitraum und die ausgewählten Studios liegen leider keine Daten vor.")
         else:
