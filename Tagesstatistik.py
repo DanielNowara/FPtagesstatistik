@@ -16,7 +16,7 @@ st.set_page_config(page_title="Tagesstatistik", page_icon="🏋️‍♂️", la
 DATA_FILE = "tagesstatistik_daten.csv"
 ZIELE_FILE = "ziele_daten.csv"
 SETTINGS_FILE = "settings.json"
-GSHEET_URL = "https://docs.google.com/spreadsheets/d/1ig4D_r-RUQ3N1IIpPrK5P9jIlEvHqa59wVMH6GN185U/edit?usp=sharing" # Wird später wichtig
+GSHEET_URL = "HIER_SPÄTER_DEINE_GOOGLE_SHEET_URL_EINTRAGEN" # Trag hier deine URL wieder ein!
 
 # Standard-Layout
 DEFAULT_LAYOUT = [
@@ -75,7 +75,7 @@ def load_data():
                     df['Datum'] = pd.to_datetime(df['Datum']).dt.date
                     return df
             except Exception:
-                pass # Fallback auf CSV, falls Tabellenblatt nicht existiert
+                pass 
     
     if os.path.exists(DATA_FILE):
         df = pd.read_csv(DATA_FILE)
@@ -85,7 +85,6 @@ def load_data():
 
 def save_data(new_data_dict):
     df = load_data()
-    # Datumsformat für Sheets/CSV vereinheitlichen
     new_data_dict['Datum'] = str(new_data_dict['Datum']) 
     
     if not df.empty and 'Datum' in df.columns and 'Studio' in df.columns:
@@ -100,13 +99,15 @@ def save_data(new_data_dict):
     else:
         df = pd.DataFrame([new_data_dict])
     
-    # Speichern
+    # TRICK GEGEN DEN InvalidJSONError: Wir konvertieren das DataFrame kurz in JSON und zurück, 
+    # damit alle speziellen NumPy-Zahlen in normale Google-verträgliche Zahlen verwandelt werden.
     if nutze_gsheets():
         client = get_gspread_client()
         if client:
             sheet = client.open_by_url(GSHEET_URL).worksheet("Tagesdaten")
             sheet.clear()
-            sheet.update([df.columns.values.tolist()] + df.values.tolist())
+            safe_values = json.loads(df.to_json(orient='values', date_format='iso'))
+            sheet.update(values=[df.columns.tolist()] + safe_values)
     else:
         df.to_csv(DATA_FILE, index=False)
 
@@ -143,7 +144,8 @@ def save_ziele(neue_ziele_dict):
         if client:
             sheet = client.open_by_url(GSHEET_URL).worksheet("Ziele")
             sheet.clear()
-            sheet.update([df.columns.values.tolist()] + df.values.tolist())
+            safe_values = json.loads(df.to_json(orient='values', date_format='iso'))
+            sheet.update(values=[df.columns.tolist()] + safe_values)
     else:
         df.to_csv(ZIELE_FILE, index=False)
 
@@ -179,7 +181,9 @@ with tab1:
     tage_im_monat = calendar.monthrange(jahr, monat)[1]
     
     df_tagesdaten = load_data()
-    df_tagesdaten['Datum'] = pd.to_datetime(df_tagesdaten['Datum']).dt.date
+    if not df_tagesdaten.empty:
+        df_tagesdaten['Datum'] = pd.to_datetime(df_tagesdaten['Datum']).dt.date
+    
     df_ziele = load_ziele()
     
     aktuelle_ziele = df_ziele[(df_ziele['Monat_Jahr'] == monat_jahr_str) & (df_ziele['Studio'] == studio)]
@@ -492,16 +496,13 @@ with tab3:
             if not df_filtered.empty:
                 st.divider()
                 
-                # --- SUB-TABS FÜR DAS DASHBOARD ---
                 tab_kpi, tab_funnel, tab_charts, tab_data = st.tabs(["🏆 Performance", "🌪️ Funnel & Struktur", "📈 Verläufe", "📋 Rohdaten"])
                 
-                # BERECHNUNGEN
                 sum_beratungen = df_filtered['Beratungen_heute'].sum() if 'Beratungen_heute' in df_filtered else 0
                 sum_abos = df_filtered['Abos_heute'].sum() if 'Abos_heute' in df_filtered else 0
                 sum_leads = (df_filtered['Leads_intern'].sum() + df_filtered['Sonstige_Leads'].sum() + df_filtered['Termine_CallIn'].sum() + df_filtered['Termine_CallOut_heute'].sum()) if 'Leads_intern' in df_filtered else 0
                 abschlussquote = (sum_abos / sum_beratungen * 100) if sum_beratungen > 0 else 0.0
                 
-                # 1. TAB: PERFORMANCE
                 with tab_kpi:
                     st.subheader("💡 Key Performance Indicators (KPIs)")
                     kpi1, kpi2, kpi3, kpi4 = st.columns(4)
@@ -520,7 +521,6 @@ with tab3:
                         if not ziel_db.empty:
                             monats_soll_abos = ziel_db.iloc[0]['Monatsziel_Abos']
                             
-                            # Tacho (Gauge) Diagramm für Abos
                             fig_gauge = go.Figure(go.Indicator(
                                 mode = "gauge+number",
                                 value = sum_abos,
@@ -542,7 +542,6 @@ with tab3:
                         else:
                             st.warning(f"Keine Monatsziele für {akt_studio} in {akt_monat_str} gefunden.")
 
-                # 2. TAB: FUNNEL & STRUKTUR
                 with tab_funnel:
                     col_fun, col_pie = st.columns(2)
                     
@@ -572,7 +571,6 @@ with tab3:
                         fig_pie.update_traces(textinfo='percent+label')
                         st.plotly_chart(fig_pie, use_container_width=True)
 
-                # 3. TAB: VERLÄUFE
                 with tab_charts:
                     st.subheader("📈 Verlaufsanalyse")
                     numerische_spalten = df_filtered.select_dtypes(include=['number']).columns.tolist()
@@ -585,7 +583,6 @@ with tab3:
                     fig_bar.update_xaxes(type='category')
                     st.plotly_chart(fig_bar, use_container_width=True)
 
-                # 4. TAB: ROHDATEN
                 with tab_data:
                     st.subheader("📋 Rohdaten im Zeitraum")
                     st.dataframe(df_filtered.sort_values(by="Datum", ascending=False), use_container_width=True)
@@ -594,4 +591,3 @@ with tab3:
                 st.warning("Für den ausgewählten Zeitraum und die ausgewählten Studios liegen leider keine Daten vor.")
         else:
             st.info("Bitte wähle ein Start- UND Enddatum im Kalender aus.")
-
