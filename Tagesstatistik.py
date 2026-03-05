@@ -215,7 +215,19 @@ with tab1:
             final_callout_woche = callout_bisher_woche + get_val("termine_callout")
             final_checkups_woche = checkups_bisher_woche + get_val("checkups_heute")
 
-            # ANTI-QUETSCH-LAYOUT: Feste 800px Breite mit scrollbarem Container
+            # STATUS FÜR ZIELKURS BERECHNEN
+            if final_abos_monat >= erwartete_abos_bisher:
+                kurs_text = f"🟢 AUF KURS (Soll: {erwartete_abos_bisher:.1f} | Ist: {final_abos_monat})"
+                kurs_bg = "#d4edda" # hellgrün
+                kurs_border = "#c3e6cb"
+                kurs_color = "#155724"
+            else:
+                kurs_text = f"🔴 HINTERHER (Soll: {erwartete_abos_bisher:.1f} | Ist: {final_abos_monat})"
+                kurs_bg = "#f8d7da" # hellrot
+                kurs_border = "#f5c6cb"
+                kurs_color = "#721c24"
+
+            # ANTI-QUETSCH-LAYOUT MIT STATUS-BOX
             html_bericht_mit_js = f"""
             <!DOCTYPE html>
             <html>
@@ -233,7 +245,10 @@ with tab1:
                     #report {{ background-color: white; color: black; padding: 30px; border: 2px solid #333; border-radius: 8px; width: 800px; min-width: 800px; box-sizing: border-box; }}
                     
                     h2 {{ text-align: center; margin-top: 0; padding-bottom: 10px; border-bottom: 2px solid black; font-size: 24px; }}
-                    .date-row {{ text-align: center; font-size: 18px; margin-bottom: 25px; }}
+                    .date-row {{ text-align: center; font-size: 18px; margin-bottom: 15px; }}
+                    
+                    .status-box {{ background-color: {kurs_bg}; color: {kurs_color}; border: 1px solid {kurs_border}; padding: 12px; border-radius: 6px; text-align: center; font-weight: bold; font-size: 18px; margin-bottom: 25px; }}
+                    
                     .row {{ display: flex; justify-content: space-between; gap: 40px; }}
                     .col {{ flex: 1; }}
                     h3 {{ background-color: #f0f0f0; padding: 6px 12px; border-left: 4px solid #d9232a; margin-bottom: 12px; font-size: 16px; margin-top: 0; }}
@@ -252,6 +267,10 @@ with tab1:
                     <div id="report">
                         <h2>Tagesstatistik Fitnesspoint {studio}</h2>
                         <div class="date-row"><strong>Datum:</strong> {eingabe_datum.strftime('%d.%m.%Y')}</div>
+                        
+                        <div class="status-box">
+                            Zielkurs-Status: {kurs_text}
+                        </div>
 
                         <div class="row">
                             <div class="col">
