@@ -186,7 +186,7 @@ with tab1:
         kommentar = st.text_area("Kommentar zum Tag (optional)")
         st.divider()
 
-        submitted = st.form_submit_button("💾 Speichern & PDF-Screenshot generieren", use_container_width=True)
+        submitted = st.form_submit_button("💾 Speichern & Bericht generieren", use_container_width=True)
 
         if submitted:
             def get_val(fid): return inputs.get(fid, 0)
@@ -206,7 +206,7 @@ with tab1:
                 "Sonstiges": get_val("sonstiges"), "CheckIns": get_val("checkins"), "Tagesziel_erreicht": tagesziel_erreicht
             }
             save_data(new_data)
-            st.success("✅ Erfolgreich gespeichert!")
+            st.success("✅ Erfolgreich gespeichert! (Bestehender Eintrag wurde überschrieben, falls vorhanden)")
 
             final_abos_monat = abos_bisher_monat + abos_heute
             final_online_monat = online_bisher_monat + get_val("online_abos_heute")
@@ -214,65 +214,62 @@ with tab1:
             final_callout_woche = callout_bisher_woche + get_val("termine_callout")
             final_checkups_woche = checkups_bisher_woche + get_val("checkups_heute")
 
-            # HTML BERICHT (Angelehnt an die Original-PDF)
+            # HTML BERICHT OHNE EINRÜCKUNG (Damit Streamlit es als echtes HTML erkennt)
             html_bericht = f"""
-            <div style="background-color: white; color: black; padding: 25px; border: 2px solid #333; border-radius: 8px; font-family: Arial, sans-serif; max-width: 600px; margin: auto; box-shadow: 2px 2px 12px rgba(0,0,0,0.1);">
-                
-                <h2 style="text-align: center; margin-top: 0; padding-bottom: 10px; border-bottom: 2px solid black;">
-                    Tagesstatistik Fitnesspoint {studio}
-                </h2>
-                
-                <p style="font-size: 16px; margin-bottom: 20px;"><strong>Datum:</strong> {eingabe_datum.strftime('%d.%m.%Y')}</p>
+<div style="background-color: white; color: black; padding: 25px; border: 2px solid #333; border-radius: 8px; font-family: Arial, sans-serif; max-width: 600px; margin: auto; box-shadow: 2px 2px 12px rgba(0,0,0,0.1);">
+    <h2 style="text-align: center; margin-top: 0; padding-bottom: 10px; border-bottom: 2px solid black;">
+        Tagesstatistik Fitnesspoint {studio}
+    </h2>
+    <p style="font-size: 16px; margin-bottom: 20px;"><strong>Datum:</strong> {eingabe_datum.strftime('%d.%m.%Y')}</p>
 
-                <h3 style="background-color: #f0f0f0; padding: 5px 10px; border-left: 4px solid #d9232a; margin-bottom: 10px;">Monatsziele:</h3>
-                <table style="width: 100%; margin-bottom: 15px; font-size: 14px;">
-                    <tr><td style="padding: 3px 0;">Monatsziel (Abos):</td><td style="text-align: right;"><strong>{ziel_abos}</strong></td></tr>
-                    <tr><td style="padding: 3px 0;">Abos (Monat):</td><td style="text-align: right;"><strong>{final_abos_monat}</strong></td></tr>
-                    <tr><td style="padding: 3px 0; padding-left: 20px; color: #555;">davon Online-Abos:</td><td style="text-align: right;">{final_online_monat}</td></tr>
-                    <tr><td style="padding: 3px 0;">Auslaufende Abos:</td><td style="text-align: right;"><strong>{ziel_auslaufend}</strong></td></tr>
-                </table>
+    <h3 style="background-color: #f0f0f0; padding: 5px 10px; border-left: 4px solid #d9232a; margin-bottom: 10px;">Monatsziele:</h3>
+    <table style="width: 100%; margin-bottom: 15px; font-size: 14px;">
+        <tr><td style="padding: 3px 0;">Monatsziel (Abos):</td><td style="text-align: right;"><strong>{ziel_abos}</strong></td></tr>
+        <tr><td style="padding: 3px 0;">Abos (Monat):</td><td style="text-align: right;"><strong>{final_abos_monat}</strong></td></tr>
+        <tr><td style="padding: 3px 0; padding-left: 20px; color: #555;">davon Online-Abos:</td><td style="text-align: right;">{final_online_monat}</td></tr>
+        <tr><td style="padding: 3px 0;">Auslaufende Abos:</td><td style="text-align: right;"><strong>{ziel_auslaufend}</strong></td></tr>
+    </table>
 
-                <h3 style="background-color: #f0f0f0; padding: 5px 10px; border-left: 4px solid #d9232a; margin-bottom: 10px;">Tagesziel:</h3>
-                <table style="width: 100%; margin-bottom: 15px; font-size: 14px;">
-                    <tr><td style="padding: 3px 0;">Beratungen heute:</td><td style="text-align: right;"><strong>{new_data['Beratungen_heute']}</strong></td></tr>
-                    <tr><td style="padding: 3px 0; padding-top: 10px;"><strong>Abos gesamt heute:</strong></td><td style="text-align: right; padding-top: 10px;"><strong>{abos_heute}</strong></td></tr>
-                    <tr><td style="padding: 3px 0; padding-left: 20px; color: #555;">davon Online-Abos:</td><td style="text-align: right;">{new_data['Online_Abos_heute']}</td></tr>
-                    <tr><td style="padding: 3px 0; padding-left: 20px; color: #555;">davon 12 Monate:</td><td style="text-align: right;">{new_data['Abos_12M']}</td></tr>
-                    <tr><td style="padding: 3px 0; padding-left: 20px; color: #555;">davon 1 Monat:</td><td style="text-align: right;">{new_data['Abos_1M']}</td></tr>
-                    <tr><td style="padding: 3px 0; padding-left: 20px; color: #555;">davon Fitness+:</td><td style="text-align: right;">{new_data['Abos_FitnessPlus']}</td></tr>
-                </table>
+    <h3 style="background-color: #f0f0f0; padding: 5px 10px; border-left: 4px solid #d9232a; margin-bottom: 10px;">Tagesziel:</h3>
+    <table style="width: 100%; margin-bottom: 15px; font-size: 14px;">
+        <tr><td style="padding: 3px 0;">Beratungen heute:</td><td style="text-align: right;"><strong>{new_data['Beratungen_heute']}</strong></td></tr>
+        <tr><td style="padding: 3px 0; padding-top: 10px;"><strong>Abos gesamt heute:</strong></td><td style="text-align: right; padding-top: 10px;"><strong>{abos_heute}</strong></td></tr>
+        <tr><td style="padding: 3px 0; padding-left: 20px; color: #555;">davon Online-Abos:</td><td style="text-align: right;">{new_data['Online_Abos_heute']}</td></tr>
+        <tr><td style="padding: 3px 0; padding-left: 20px; color: #555;">davon 12 Monate:</td><td style="text-align: right;">{new_data['Abos_12M']}</td></tr>
+        <tr><td style="padding: 3px 0; padding-left: 20px; color: #555;">davon 1 Monat:</td><td style="text-align: right;">{new_data['Abos_1M']}</td></tr>
+        <tr><td style="padding: 3px 0; padding-left: 20px; color: #555;">davon Fitness+:</td><td style="text-align: right;">{new_data['Abos_FitnessPlus']}</td></tr>
+    </table>
 
-                <h3 style="background-color: #f0f0f0; padding: 5px 10px; border-left: 4px solid #d9232a; margin-bottom: 10px;">EOAs Wochenziele (Mo-So):</h3>
-                <table style="width: 100%; margin-bottom: 15px; font-size: 14px;">
-                    <tr><td style="padding: 3px 0;">VIP-Leads (Ziel {ziel_vip_woche}):</td><td style="text-align: right;"><strong>{final_vip_woche}</strong></td></tr>
-                    <tr><td style="padding: 3px 0;">Termine Call-out (Ziel {ziel_callout_woche}):</td><td style="text-align: right;"><strong>{final_callout_woche}</strong></td></tr>
-                    <tr><td style="padding: 3px 0;">Check Ups (Ziel: {ziel_checkups_woche}):</td><td style="text-align: right;"><strong>{final_checkups_woche}</strong></td></tr>
-                </table>
+    <h3 style="background-color: #f0f0f0; padding: 5px 10px; border-left: 4px solid #d9232a; margin-bottom: 10px;">EOAs Wochenziele (Mo-So):</h3>
+    <table style="width: 100%; margin-bottom: 15px; font-size: 14px;">
+        <tr><td style="padding: 3px 0;">VIP-Leads (Ziel {ziel_vip_woche}):</td><td style="text-align: right;"><strong>{final_vip_woche}</strong></td></tr>
+        <tr><td style="padding: 3px 0;">Termine Call-out (Ziel {ziel_callout_woche}):</td><td style="text-align: right;"><strong>{final_callout_woche}</strong></td></tr>
+        <tr><td style="padding: 3px 0;">Check Ups (Ziel: {ziel_checkups_woche}):</td><td style="text-align: right;"><strong>{final_checkups_woche}</strong></td></tr>
+    </table>
 
-                <hr style="border: 0; border-top: 1px solid #ccc; margin: 20px 0;">
+    <hr style="border: 0; border-top: 1px solid #ccc; margin: 20px 0;">
 
-                <table style="width: 100%; margin-bottom: 15px; font-size: 14px;">
-                    <tr><td style="padding: 4px 0;">Leads intern (VIP/10er Karte):</td><td style="text-align: right;"><strong>{new_data['Leads_intern']}</strong></td></tr>
-                    <tr><td style="padding: 4px 0;">Sonstige Leads:</td><td style="text-align: right;"><strong>{new_data['Sonstige_Leads']}</strong></td></tr>
-                    <tr><td style="padding: 4px 0;">Termine durch Call-in:</td><td style="text-align: right;"><strong>{new_data['Termine_CallIn']}</strong></td></tr>
-                    <tr><td style="padding: 4px 0;">Termine durch Call-out:</td><td style="text-align: right;"><strong>{new_data['Termine_CallOut_heute']}</strong></td></tr>
-                    <tr><td style="padding: 3px 0; padding-left: 20px; color: #555;">davon Fitness+:</td><td style="text-align: right;">{new_data['Termine_CallOut_FitnessPlus']}</td></tr>
-                    <tr><td style="padding: 4px 0;">Sonstiges (z.B: Check Ups / PT):</td><td style="text-align: right;"><strong>{new_data['Sonstiges']}</strong></td></tr>
-                    <tr><td style="padding: 4px 0;">Check-Ins:</td><td style="text-align: right;"><strong>{new_data['CheckIns']}</strong></td></tr>
-                </table>
+    <table style="width: 100%; margin-bottom: 15px; font-size: 14px;">
+        <tr><td style="padding: 4px 0;">Leads intern (VIP/10er Karte):</td><td style="text-align: right;"><strong>{new_data['Leads_intern']}</strong></td></tr>
+        <tr><td style="padding: 4px 0;">Sonstige Leads:</td><td style="text-align: right;"><strong>{new_data['Sonstige_Leads']}</strong></td></tr>
+        <tr><td style="padding: 4px 0;">Termine durch Call-in:</td><td style="text-align: right;"><strong>{new_data['Termine_CallIn']}</strong></td></tr>
+        <tr><td style="padding: 4px 0;">Termine durch Call-out:</td><td style="text-align: right;"><strong>{new_data['Termine_CallOut_heute']}</strong></td></tr>
+        <tr><td style="padding: 3px 0; padding-left: 20px; color: #555;">davon Fitness+:</td><td style="text-align: right;">{new_data['Termine_CallOut_FitnessPlus']}</td></tr>
+        <tr><td style="padding: 4px 0;">Sonstiges (z.B: Check Ups / PT):</td><td style="text-align: right;"><strong>{new_data['Sonstiges']}</strong></td></tr>
+        <tr><td style="padding: 4px 0;">Check-Ins:</td><td style="text-align: right;"><strong>{new_data['CheckIns']}</strong></td></tr>
+    </table>
 
-                <div style="background-color: #f9f9f9; padding: 15px; border: 1px solid #ddd; text-align: center; margin-top: 20px;">
-                    <strong style="font-size: 16px;">TAGESZIEL ERREICHT:</strong> 
-                    <span style="margin-left: 15px; font-size: 18px;">JA: {ja_box}</span>
-                    <span style="margin-left: 15px; font-size: 18px;">NEIN: {nein_box}</span>
-                </div>
-                
-                <p style="text-align: center; font-style: italic; font-size: 12px; margin-top: 20px; color: #666;">
-                    "Nur wer sein Ziel kennt, findet den Weg dorthin"
-                </p>
-
-            </div>
-            """
+    <div style="background-color: #f9f9f9; padding: 15px; border: 1px solid #ddd; text-align: center; margin-top: 20px;">
+        <strong style="font-size: 16px;">TAGESZIEL ERREICHT:</strong> 
+        <span style="margin-left: 15px; font-size: 18px;">JA: {ja_box}</span>
+        <span style="margin-left: 15px; font-size: 18px;">NEIN: {nein_box}</span>
+    </div>
+    
+    <p style="text-align: center; font-style: italic; font-size: 12px; margin-top: 20px; color: #666;">
+        "Nur wer sein Ziel kennt, findet den Weg dorthin"
+    </p>
+</div>
+"""
             
             st.info("📸 **Fertig! Du kannst diesen Bericht jetzt einfach abfotografieren oder einen Screenshot machen und ihn in WhatsApp teilen:**")
             st.markdown(html_bericht, unsafe_allow_html=True)
