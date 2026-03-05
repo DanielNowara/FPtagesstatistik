@@ -16,7 +16,7 @@ st.set_page_config(page_title="Tagesstatistik", page_icon="🏋️‍♂️", la
 DATA_FILE = "tagesstatistik_daten.csv"
 ZIELE_FILE = "ziele_daten.csv"
 SETTINGS_FILE = "settings.json"
-GSHEET_URL = "HIER_SPÄTER_DEINE_GOOGLE_SHEET_URL_EINTRAGEN" # Trag hier deine URL wieder ein!
+GSHEET_URL = "https://docs.google.com/spreadsheets/d/1ig4D_r-RUQ3N1IIpPrK5P9jIlEvHqa59wVMH6GN185U/edit?usp=sharing" # Trag hier deine URL wieder ein!
 
 # Standard-Layout
 DEFAULT_LAYOUT = [
@@ -591,3 +591,4 @@ with tab3:
                 st.warning("Für den ausgewählten Zeitraum und die ausgewählten Studios liegen leider keine Daten vor.")
         else:
             st.info("Bitte wähle ein Start- UND Enddatum im Kalender aus.")
+
