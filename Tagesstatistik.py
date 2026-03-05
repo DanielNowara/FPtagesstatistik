@@ -215,17 +215,23 @@ with tab1:
             final_callout_woche = callout_bisher_woche + get_val("termine_callout")
             final_checkups_woche = checkups_bisher_woche + get_val("checkups_heute")
 
-            # NEUES, BREITES 2-SPALTEN LAYOUT (Perfekt für Screenshots)
+            # ANTI-QUETSCH-LAYOUT: Feste 800px Breite mit scrollbarem Container
             html_bericht_mit_js = f"""
             <!DOCTYPE html>
             <html>
             <head>
                 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
                 <style>
-                    body {{ font-family: Arial, sans-serif; padding: 10px; background-color: white; display: flex; flex-direction: column; align-items: center; }}
-                    #report {{ background-color: white; color: black; padding: 30px; border: 2px solid #333; border-radius: 8px; width: 100%; max-width: 800px; box-sizing: border-box; }}
-                    .btn {{ margin-bottom: 20px; padding: 15px 20px; background-color: #25D366; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; box-shadow: 1px 1px 5px rgba(0,0,0,0.3); width: 100%; max-width: 800px; }}
+                    body {{ font-family: Arial, sans-serif; padding: 10px; background-color: white; margin: 0; }}
+                    .btn {{ margin-bottom: 20px; padding: 15px 20px; background-color: #25D366; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; box-shadow: 1px 1px 5px rgba(0,0,0,0.3); width: 100%; display: block; text-align: center; }}
                     .btn:hover {{ background-color: #128C7E; }}
+                    
+                    /* Der Container sorgt dafür, dass auf dem Handy gescrollt werden kann */
+                    .report-wrapper {{ width: 100%; overflow-x: auto; padding-bottom: 20px; display: flex; justify-content: flex-start; }}
+                    
+                    /* Dieses Feld bleibt immer stur 800 Pixel breit! */
+                    #report {{ background-color: white; color: black; padding: 30px; border: 2px solid #333; border-radius: 8px; width: 800px; min-width: 800px; box-sizing: border-box; }}
+                    
                     h2 {{ text-align: center; margin-top: 0; padding-bottom: 10px; border-bottom: 2px solid black; font-size: 24px; }}
                     .date-row {{ text-align: center; font-size: 18px; margin-bottom: 25px; }}
                     .row {{ display: flex; justify-content: space-between; gap: 40px; }}
@@ -240,67 +246,70 @@ with tab1:
                 </style>
             </head>
             <body>
-                <button class="btn" onclick="downloadImage()">📸 Bericht als breites Bild für WhatsApp speichern</button>
+                <button class="btn" onclick="downloadImage()">📸 Bericht als Bild für WhatsApp speichern</button>
                 
-                <div id="report">
-                    <h2>Tagesstatistik Fitnesspoint {studio}</h2>
-                    <div class="date-row"><strong>Datum:</strong> {eingabe_datum.strftime('%d.%m.%Y')}</div>
+                <div class="report-wrapper">
+                    <div id="report">
+                        <h2>Tagesstatistik Fitnesspoint {studio}</h2>
+                        <div class="date-row"><strong>Datum:</strong> {eingabe_datum.strftime('%d.%m.%Y')}</div>
 
-                    <div class="row">
-                        <div class="col">
-                            <h3>Monatsziele:</h3>
-                            <table>
-                                <tr><td>Monatsziel (Abos):</td><td class="right"><strong>{ziel_abos}</strong></td></tr>
-                                <tr><td>Abos (Monat):</td><td class="right"><strong>{final_abos_monat}</strong></td></tr>
-                                <tr><td class="sub">davon Online-Abos:</td><td class="right">{final_online_monat}</td></tr>
-                                <tr><td>Auslaufende Abos:</td><td class="right"><strong>{ziel_auslaufend}</strong></td></tr>
-                            </table>
+                        <div class="row">
+                            <div class="col">
+                                <h3>Monatsziele:</h3>
+                                <table>
+                                    <tr><td>Monatsziel (Abos):</td><td class="right"><strong>{ziel_abos}</strong></td></tr>
+                                    <tr><td>Abos (Monat):</td><td class="right"><strong>{final_abos_monat}</strong></td></tr>
+                                    <tr><td class="sub">davon Online-Abos:</td><td class="right">{final_online_monat}</td></tr>
+                                    <tr><td>Auslaufende Abos:</td><td class="right"><strong>{ziel_auslaufend}</strong></td></tr>
+                                </table>
 
-                            <h3>Tagesziel:</h3>
-                            <table>
-                                <tr><td>Beratungen heute:</td><td class="right"><strong>{new_data['Beratungen_heute']}</strong></td></tr>
-                                <tr><td style="padding-top: 10px;"><strong>Abos gesamt heute:</strong></td><td class="right" style="padding-top: 10px;"><strong>{abos_heute}</strong></td></tr>
-                                <tr><td class="sub">davon Online-Abos:</td><td class="right">{new_data['Online_Abos_heute']}</td></tr>
-                                <tr><td class="sub">davon 12 Monate:</td><td class="right">{new_data['Abos_12M']}</td></tr>
-                                <tr><td class="sub">davon 1 Monat:</td><td class="right">{new_data['Abos_1M']}</td></tr>
-                                <tr><td class="sub">davon Fitness+:</td><td class="right">{new_data['Abos_FitnessPlus']}</td></tr>
-                            </table>
+                                <h3>Tagesziel:</h3>
+                                <table>
+                                    <tr><td>Beratungen heute:</td><td class="right"><strong>{new_data['Beratungen_heute']}</strong></td></tr>
+                                    <tr><td style="padding-top: 10px;"><strong>Abos gesamt heute:</strong></td><td class="right" style="padding-top: 10px;"><strong>{abos_heute}</strong></td></tr>
+                                    <tr><td class="sub">davon Online-Abos:</td><td class="right">{new_data['Online_Abos_heute']}</td></tr>
+                                    <tr><td class="sub">davon 12 Monate:</td><td class="right">{new_data['Abos_12M']}</td></tr>
+                                    <tr><td class="sub">davon 1 Monat:</td><td class="right">{new_data['Abos_1M']}</td></tr>
+                                    <tr><td class="sub">davon Fitness+:</td><td class="right">{new_data['Abos_FitnessPlus']}</td></tr>
+                                </table>
+                            </div>
+
+                            <div class="col">
+                                <h3>EOAs Wochenziele (Mo-So):</h3>
+                                <table>
+                                    <tr><td>VIP-Leads (Ziel {ziel_vip_woche}):</td><td class="right"><strong>{final_vip_woche}</strong></td></tr>
+                                    <tr><td>Termine Call-out (Ziel {ziel_callout_woche}):</td><td class="right"><strong>{final_callout_woche}</strong></td></tr>
+                                    <tr><td>Check Ups (Ziel: {ziel_checkups_woche}):</td><td class="right"><strong>{final_checkups_woche}</strong></td></tr>
+                                </table>
+
+                                <h3>Aktivitäten Heute:</h3>
+                                <table style="margin-bottom: 0;">
+                                    <tr><td>Leads intern (VIP/10er):</td><td class="right"><strong>{new_data['Leads_intern']}</strong></td></tr>
+                                    <tr><td>Sonstige Leads:</td><td class="right"><strong>{new_data['Sonstige_Leads']}</strong></td></tr>
+                                    <tr><td>Termine Call-in:</td><td class="right"><strong>{new_data['Termine_CallIn']}</strong></td></tr>
+                                    <tr><td>Termine Call-out:</td><td class="right"><strong>{new_data['Termine_CallOut_heute']}</strong></td></tr>
+                                    <tr><td class="sub">davon Fitness+:</td><td class="right">{new_data['Termine_CallOut_FitnessPlus']}</td></tr>
+                                    <tr><td>Sonstiges (Check Ups / PT):</td><td class="right"><strong>{new_data['Sonstiges']}</strong></td></tr>
+                                    <tr><td>Check-Ins:</td><td class="right"><strong>{new_data['CheckIns']}</strong></td></tr>
+                                </table>
+                            </div>
                         </div>
 
-                        <div class="col">
-                            <h3>EOAs Wochenziele (Mo-So):</h3>
-                            <table>
-                                <tr><td>VIP-Leads (Ziel {ziel_vip_woche}):</td><td class="right"><strong>{final_vip_woche}</strong></td></tr>
-                                <tr><td>Termine Call-out (Ziel {ziel_callout_woche}):</td><td class="right"><strong>{final_callout_woche}</strong></td></tr>
-                                <tr><td>Check Ups (Ziel: {ziel_checkups_woche}):</td><td class="right"><strong>{final_checkups_woche}</strong></td></tr>
-                            </table>
-
-                            <h3>Aktivitäten Heute:</h3>
-                            <table style="margin-bottom: 0;">
-                                <tr><td>Leads intern (VIP/10er):</td><td class="right"><strong>{new_data['Leads_intern']}</strong></td></tr>
-                                <tr><td>Sonstige Leads:</td><td class="right"><strong>{new_data['Sonstige_Leads']}</strong></td></tr>
-                                <tr><td>Termine Call-in:</td><td class="right"><strong>{new_data['Termine_CallIn']}</strong></td></tr>
-                                <tr><td>Termine Call-out:</td><td class="right"><strong>{new_data['Termine_CallOut_heute']}</strong></td></tr>
-                                <tr><td class="sub">davon Fitness+:</td><td class="right">{new_data['Termine_CallOut_FitnessPlus']}</td></tr>
-                                <tr><td>Sonstiges (Check Ups / PT):</td><td class="right"><strong>{new_data['Sonstiges']}</strong></td></tr>
-                                <tr><td>Check-Ins:</td><td class="right"><strong>{new_data['CheckIns']}</strong></td></tr>
-                            </table>
+                        <div class="target-box">
+                            <strong style="font-size: 18px;">TAGESZIEL ERREICHT:</strong> 
+                            <span style="margin-left: 20px; font-size: 20px;">JA: {ja_box}</span>
+                            <span style="margin-left: 20px; font-size: 20px;">NEIN: {nein_box}</span>
                         </div>
+                        
+                        <p class="quote">"Nur wer sein Ziel kennt, findet den Weg dorthin"</p>
                     </div>
-
-                    <div class="target-box">
-                        <strong style="font-size: 18px;">TAGESZIEL ERREICHT:</strong> 
-                        <span style="margin-left: 20px; font-size: 20px;">JA: {ja_box}</span>
-                        <span style="margin-left: 20px; font-size: 20px;">NEIN: {nein_box}</span>
-                    </div>
-                    
-                    <p class="quote">"Nur wer sein Ziel kennt, findet den Weg dorthin"</p>
                 </div>
 
                 <script>
                 function downloadImage() {{
                     const element = document.getElementById('report');
-                    html2canvas(element, {{ scale: 2 }}).then(canvas => {{
+                    // windowWidth erzwingt, dass html2canvas das Bild im 800px Modus schießt!
+                    html2canvas(element, {{ scale: 2, windowWidth: 800 }}).then(canvas => {{
                         let link = document.createElement('a');
                         link.download = 'Tagesstatistik_{studio}_{eingabe_datum.strftime("%d_%m_%Y")}.png';
                         link.href = canvas.toDataURL('image/png');
@@ -313,8 +322,7 @@ with tab1:
             """
             
             st.info("Klicke auf den grünen Button, um das fertige Bild im neuen Breitbild-Format direkt herunterzuladen!")
-            # Die Höhe des Containers anpassen, da das Bild jetzt breiter und flacher ist
-            components.html(html_bericht_mit_js, height=800, scrolling=True)
+            components.html(html_bericht_mit_js, height=850, scrolling=True)
 
 # ==========================================
 # TAB 2: ADMIN & SETUP
