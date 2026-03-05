@@ -215,7 +215,7 @@ with tab1:
             final_checkups_woche = checkups_bisher_woche + get_val("checkups_heute")
 
             # HTML BERICHT OHNE EINRÜCKUNG (Damit Streamlit es als echtes HTML erkennt)
-            html_bericht = f"""<div style="background-color: white; color: black; padding: 25px; border: 2px solid #333; border-radius: 8px; font-family: Arial, sans-serif; max-width: 600px; margin: auto; box-shadow: 2px 2px 12px rgba(0,0,0,0.1);">
+    html_bericht = f"""<div style="background-color: white; color: black; padding: 25px; border: 2px solid #333; border-radius: 8px; font-family: Arial, sans-serif; max-width: 600px; margin: auto; box-shadow: 2px 2px 12px rgba(0,0,0,0.1);">
     <h2 style="text-align: center; margin-top: 0; padding-bottom: 10px; border-bottom: 2px solid black;">
         Tagesstatistik Fitnesspoint {studio}
     </h2>
@@ -424,4 +424,5 @@ with tab3:
                 st.warning("Für den ausgewählten Zeitraum und die ausgewählten Studios liegen leider keine Daten vor.")
         else:
             st.info("Bitte wähle ein Start- UND Enddatum im Kalender aus.")
+
 
